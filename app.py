@@ -137,4 +137,7 @@ def index():
     else:
         ip = request.remote_addr
     
-    return render_template("index.html", ip=ip, active=get_active_vpn(ip))
+    active = get_active_vpn(ip).replace("MULLVAD_", "").replace("_VPN", "").lower().capitalize()
+    if active == "Usa": active = "USA"
+    
+    return render_template("index.html", ip=ip, active=active)

@@ -3,24 +3,26 @@
     <body>
         <h1>popesco.io VPN manager</h1>
         <h2>Configuring {{ip}}</h2>
+        <h3>Current: {{active}}</h3>
+
 
         <form id="foo">
-            <input type="radio" id="none" name="vpn" value="none" {% if active == "none" %}
+            <input type="radio" id="none" name="vpn" value="none" {% if active == "None" %}
             checked
             {% endif %}>
             <label for="none">None</label><br>
 
-            <input type="radio" id="canada" name="vpn" value="MULLVAD_CANADA_VPN" {% if active == "MULLVAD_CANADA_VPN" %}
+            <input type="radio" id="canada" name="vpn" value="MULLVAD_CANADA_VPN" {% if active == "Canada" %}
             checked
             {% endif %}>
             <label for="canada">Canada</label><br>
 
-            <input type="radio" id="usa" name="vpn" value="MULLVAD_USA_VPN" {% if active == "MULLVAD_USA_VPN" %}
+            <input type="radio" id="usa" name="vpn" value="MULLVAD_USA_VPN" {% if active == "USA" %}
             checked
             {% endif %}>
             <label for="usa">USA</label><br>
 
-            <input type="radio" id="netherlands" name="vpn" value="MULLVAD_NETHERLANDS_VPN" {% if active == "MULLVAD_NETHERLANDS_VPN" %}
+            <input type="radio" id="netherlands" name="vpn" value="MULLVAD_NETHERLANDS_VPN" {% if active == "Netherlands" %}
             checked
             {% endif %}>
             <label for="none">Netherlands</label><br><br>
@@ -38,7 +40,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(Object.fromEntries(formData))
-            });
+            }).then(() => window.location.reload());
         
             const result = await response.json();
             console.log(result)
