@@ -102,14 +102,22 @@ def get_active_vpn(ip):
 
 @app.route('/active_vpn', methods=["GET"])
 def get_vpn():
-    ip = request.remote_addr
+    if "X-Real-IP" in request.headers:
+        ip = request.headers["X-Real-IP"]
+    else:
+        ip = request.remote_addr
+    
     current_vpn = get_active_vpn(ip)
     return jsonify({"vpn": current_vpn})
 
 
 @app.route('/activate_vpn', methods=["POST"])
 def use_vpn():
-    ip = request.remote_addr
+    if "X-Real-IP" in request.headers:
+        ip = request.headers["X-Real-IP"]
+    else:
+        ip = request.remote_addr
+
     print(f"INFO :: Making sure {ip} is not currently active...")
     purge_ip(ip)
     input_json = request.get_json(force = True)
@@ -124,6 +132,9 @@ def use_vpn():
 
 @app.route('/', methods=["GET"])
 def index():
-    ip = request.remote_addr
+    if "X-Real-IP" in request.headers:
+        ip = request.headers["X-Real-IP"]
+    else:
+        ip = request.remote_addr
     
     return render_template("index.html", ip=ip, active=get_active_vpn(ip))
