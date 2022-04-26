@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>popesco.io VPN manager</h1>
+        <h2>Configuring {{ip}}</h2>
+
+        <form id="foo">
+            <input type="radio" id="none" name="vpn" value="none" {% if active == "none" %}
+            checked
+            {% endif %}>
+            <label for="none">None</label><br>
+
+            <input type="radio" id="canada" name="vpn" value="MULLVAD_CANADA_VPN" {% if active == "MULLVAD_CANADA_VPN" %}
+            checked
+            {% endif %}>
+            <label for="canada">Canada</label><br>
+
+            <input type="radio" id="usa" name="vpn" value="MULLVAD_USA_VPN" {% if active == "MULLVAD_USA_VPN" %}
+            checked
+            {% endif %}>
+            <label for="usa">USA</label><br>
+
+            <input type="radio" id="netherlands" name="vpn" value="MULLVAD_NETHERLANDS_VPN" {% if active == "MULLVAD_NETHERLANDS_VPN" %}
+            checked
+            {% endif %}>
+            <label for="none">Netherlands</label><br>
+
+            <input id="postSubmit" type="submit", value="Confirm">
+        </form>
+    </body>
+    <script>
+        const thisForm = document.getElementById('foo');
+        thisForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(thisForm).entries()
+            console.log(formData);
+            const response = await fetch(window.location.origin + "/activate_vpn", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+        
+            const result = await response.json();
+            console.log(result)
+        });
+            </script>
+</html>
