@@ -1,3 +1,3 @@
-# pfSense-VPN-manager
+# opnSense-VPN-manager
 
-Flask app to toggle VPN settings for current host in pfSense.
+Flask app to toggle VPN settings for current host in opnSense.

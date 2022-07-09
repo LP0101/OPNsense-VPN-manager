@@ -10,92 +10,85 @@ import datetime
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
 
-pfsense_username = getenv('PFSENSE_USERNAME')
-pfsense_password = getenv('PFSENSE_PASSWORD')
-pfsense_host = getenv('PFSENSE_HOST', 'https://192.168.10.1')
-params = {"client-id": pfsense_username, "client-token": pfsense_password}
+credentials = (getenv('OPNSENSE_USERNAME'), getenv('OPNSENSE_PASSWORD'))
+opnsense_host = getenv('OPNSENSE_HOST', 'https://192.168.10.1')
 
-montreal_alias_name = "MULLVAD_CANADA_VPN"
-new_york_alias_name = "MULLVAD_USA_VPN"
-netherlands_alias_name = "MULLVAD_NETHERLANDS_VPN"
+alias_names = [
+"MTL_MANAGED_VPN",
+"NYC_MANAGED_VPN",
+"NL_MANAGED_VPN",
+]
 
-def apply_vpn(IPs, alias):
-    address = []
-    detail = []
-    for k,v in IPs.items():
-        if k == '':
-            continue
-        address.append(k)
-        detail.append(v)
-    body = {}
-    body['id'] = alias
-    body['address'] = address
-    body['detail'] = detail
-    body["client-id"] = pfsense_username
-    body["client-token"] = pfsense_password
-    body["apply"] = True
+VPN_NAMES = [
+"Canada"
+"USA"
+"Netherlands"
+]
 
-    requests.put(f"{pfsense_host}/api/v1/firewall/alias", json.dumps(body), verify = False)
+def apply_alias(alias): 
+    alias['alias']['content'] = "\n".join(alias['alias']['content'])
+    uuid = get_uuid(alias['alias']['name'])
+    requests.post(f"{opnsense_host}/api/firewall/alias/setItem/{uuid}", auth=credentials, verify=False, json=alias).content
 
-def get_vpn_connections():
-    aliases = requests.get(f"{pfsense_host}/api/v1/firewall/alias", params = params, verify=False).json()["data"]
+def set_aliases():
+    print(requests.post(f"{opnsense_host}/api/firewall/alias/set", auth=credentials, verify=False).content)
 
-    montreal_alias = [d for d in aliases if d['name'] == montreal_alias_name][0]
-    new_york_alias = [d for d in aliases if d['name'] == new_york_alias_name][0]
-    netherlands_alias = [d for d in aliases if d['name'] == netherlands_alias_name][0]
-    montreal_vpn_addresses = montreal_alias["address"].split(" ")
-    montreal_vpn_details = montreal_alias["detail"].split("||")
-    new_york_vpn_addresses = new_york_alias["address"].split(" ")
-    new_york_vpn_details = new_york_alias["detail"].split("||")
-    netherlands_vpn_addresses = netherlands_alias["address"].split(" ")
-    netherlands_vpn_details = netherlands_alias["detail"].split("||")
+def get_uuid(alias):
+    return requests.get(f"{opnsense_host}/api/firewall/alias/getAliasUUID/{alias}", auth=credentials, verify=False).json()["uuid"]
 
-    vpn_status = {}
+def get_current_aliases():
+    current_aliases = {}
+    for alias in alias_names:
+        alias_uuid = get_uuid(alias)
+        alias_json = requests.get(f"https://192.168.100.1/api/firewall/alias/getItem/{alias_uuid}", auth=credentials, verify=False).json()
+        content = []
+        for key in alias_json['alias']['content']:
+            if key.startswith("192.168."):
+                content.append(key)
+        description = alias_json['alias']['description']
+        current_aliases[alias] = {}
+        current_aliases[alias]['alias'] = {}
+        current_aliases[alias]['alias']["content"] = content
+        current_aliases[alias]['alias']["description"] = description
+        current_aliases[alias]['alias']["name"] = alias
+        current_aliases[alias]['alias']['enabled'] = '1'
+        current_aliases[alias]['alias']['counters'] = '0'
+        current_aliases[alias]['alias']['interface'] = ''
+        current_aliases[alias]['alias']['proto'] = ''
+        current_aliases[alias]['alias']['updatefreq'] = ''
+        current_aliases[alias]['alias']['type'] = 'host'
+        current_aliases[alias]['network_content'] = ''
+    return current_aliases
 
-    vpn_status[montreal_alias_name] = {}
-    for i,ip in enumerate(montreal_vpn_addresses):
-        vpn_status[montreal_alias_name][ip] = montreal_vpn_details[i]
-
-    vpn_status[new_york_alias_name] = {}
-    for i,ip in enumerate(new_york_vpn_addresses):
-        vpn_status[new_york_alias_name][ip] = new_york_vpn_details[i]
-
-    vpn_status[netherlands_alias_name] = {}
-    for i,ip in enumerate(netherlands_vpn_addresses):
-        vpn_status[netherlands_alias_name][ip] = netherlands_vpn_details[i]
-
-    return vpn_status
-
-def add_ip(ip, alias):
-    active_connections = get_vpn_connections()[alias]
-    active_connections[ip] = f"Added by VPN manager on {datetime.date.today()}"
-    apply_vpn(active_connections, alias)
+def add_ip(ip, alias): 
+    current_alias = get_current_aliases()[alias]
+    current_alias['alias']['content'].append(ip)
+    apply_alias(current_alias)
 
 
 
 def purge_ip(ip):
-    vpn_status = get_vpn_connections()
+    aliases = get_current_aliases()
+    for name, alias in aliases.items():
+        if ip in alias['alias']['content']:
+            print(alias)
+            print(f"INFO :: Found active connection for {ip} in {name}. Deleting...")
+            alias['alias']['content'].remove(ip)
+        apply_alias(alias)
 
-    for alias, IPs in vpn_status.items():
-        if ip in IPs:
-            print(f"INFO :: Found active connection for {ip} in {alias}. Deleting...")
-            del IPs[ip]
-    for alias, IPs in vpn_status.items():
-        apply_vpn(IPs, alias)
-
-def get_active_vpn(ip):
-    vpn_status = get_vpn_connections()
+def get_active_vpn(ip): 
+    aliases = get_current_aliases()
     current_vpn = "none"
     found = False
 
-    for endpoint, IPs in vpn_status.items():
-        if ip in IPs:
+    for alias in aliases.values():
+        if ip in alias['alias']['content']:
             if found:
                 print("ERROR :: IP found in multiple lists, fixing status...")
                 purge_ip(ip)
                 current_vpn = "none"
                 break
-            current_vpn = endpoint
+            current_vpn = alias
             found = True
     return current_vpn
 
@@ -127,6 +120,7 @@ def use_vpn():
         print(f"INFO :: Using {alias} for {ip}")
     else:
         print(f"INFO :: Disabling VPN for {ip}")
+    set_aliases()
     return make_response(jsonify({}), 200)
 
 
@@ -137,7 +131,13 @@ def index():
     else:
         ip = request.remote_addr
     
-    active = get_active_vpn(ip).replace("MULLVAD_", "").replace("_VPN", "").lower().capitalize()
-    if active == "Usa": active = "USA"
+    active = get_active_vpn(ip)
+    if isinstance(active, dict):
+        active = active["alias"]["name"]
+        # Make this nicer pls
+        if active == "NYC_MANAGED_VPN": active = "USA"
+        if active == "MTL_MANAGED_VPN": active = "Canada"
+        if active == "NL_MANAGED_VPN": active = "NL"
+    else: active = "None"
     
     return render_template("index.html", ip=ip, active=active)
