@@ -4,8 +4,7 @@ import random
 import requests
 import urllib3
 from os import getenv
-import datetime
-
+import time
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
@@ -32,6 +31,7 @@ def apply_alias(alias):
 
 def set_aliases():
     print(requests.post(f"{opnsense_host}/api/firewall/alias/set", auth=credentials, verify=False).content)
+    print(requests.post(f"{opnsense_host}/api/firewall/alias/reconfigure", auth=credentials, verify=False).content)
 
 def get_uuid(alias):
     return requests.get(f"{opnsense_host}/api/firewall/alias/getAliasUUID/{alias}", auth=credentials, verify=False).json()["uuid"]
